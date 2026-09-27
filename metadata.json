@@ -1,0 +1,6 @@
+{
+  "name": "SafeNet Corporate Security & Risk Management",
+  "description": "SafeNet provides enterprise corporate security solutions, physical asset protection, risk management, and compliance advisory for organizations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
