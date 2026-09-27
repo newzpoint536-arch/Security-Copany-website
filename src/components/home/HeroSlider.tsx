@@ -26,10 +26,19 @@ export const HeroSlider: React.FC = () => {
   const [videoError, setVideoError] = useState<Record<string, boolean>>({});
   const [videoReady, setVideoReady] = useState<Record<string, boolean>>({});
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const progressIntervalRef = useRef<number | null>(null);
   const currentSlide = activeSlides[currentIndex] || activeSlides[0];
+
+  // Enable Ken Burns transition immediately after initial mount and paint so slide 0 animates on initial load
+  useEffect(() => {
+    const timer = requestAnimationFrame(() => {
+      setIsMounted(true);
+    });
+    return () => cancelAnimationFrame(timer);
+  }, []);
 
   // Duration for current slide
   const duration = currentSlide?.durationMs || 6500;
@@ -164,26 +173,44 @@ export const HeroSlider: React.FC = () => {
         {activeSlides.map((slide, index) => {
           const isActive = index === currentIndex;
           const isVideo = slide.mediaType === 'VIDEO' && !videoError[slide.id];
+          const isStaticImage = slide.mediaType === 'IMAGE' || !!videoError[slide.id];
 
-          // Determine Ken Burns animation classes
-          let kenBurnsAnim = 'scale-105';
-          if (slide.kenBurnsMovement === 'zoom-in') {
-            kenBurnsAnim = isActive
-              ? 'scale-115 transition-transform duration-[7500ms] ease-out will-change-transform'
-              : 'scale-100';
-          } else if (slide.kenBurnsMovement === 'zoom-out') {
-            kenBurnsAnim = isActive
-              ? 'scale-100 transition-transform duration-[7500ms] ease-out will-change-transform'
-              : 'scale-115';
-          } else if (slide.kenBurnsMovement === 'pan-left') {
-            kenBurnsAnim = isActive
-              ? 'scale-110 -translate-x-6 transition-all duration-[7500ms] ease-out will-change-transform'
-              : 'scale-110 translate-x-0';
-          } else if (slide.kenBurnsMovement === 'pan-right') {
-            kenBurnsAnim = isActive
-              ? 'scale-110 translate-x-6 transition-all duration-[7500ms] ease-out will-change-transform'
-              : 'scale-110 translate-x-0';
+          // Subtle Ken Burns animation configuration for static image slides using Tailwind CSS transitions & scaling transforms
+          const movement = slide.kenBurnsMovement || 'zoom-in';
+          const isAnimating = isActive && isMounted;
+
+          let kenBurnsTransform = 'scale-100 origin-center';
+          if (isStaticImage) {
+            if (movement === 'zoom-in') {
+              kenBurnsTransform = isAnimating
+                ? 'scale-[1.07] origin-center'
+                : 'scale-100 origin-center';
+            } else if (movement === 'zoom-out') {
+              kenBurnsTransform = isAnimating
+                ? 'scale-100 origin-center'
+                : 'scale-[1.07] origin-center';
+            } else if (movement === 'pan-left') {
+              kenBurnsTransform = isAnimating
+                ? 'scale-[1.06] -translate-x-3.5 origin-center'
+                : 'scale-[1.06] translate-x-3.5 origin-center';
+            } else if (movement === 'pan-right') {
+              kenBurnsTransform = isAnimating
+                ? 'scale-[1.06] translate-x-3.5 origin-center'
+                : 'scale-[1.06] -translate-x-3.5 origin-center';
+            }
           }
+
+          const kenBurnsClass = isStaticImage
+            ? `transform transition-transform ease-out will-change-transform ${kenBurnsTransform}`
+            : 'scale-100 origin-center';
+
+          const kenBurnsStyle = isStaticImage
+            ? {
+                transitionDuration: isAnimating
+                  ? `${(slide.durationMs || 6500) + 700}ms`
+                  : '1000ms'
+              }
+            : undefined;
 
           return (
             <div
@@ -201,7 +228,8 @@ export const HeroSlider: React.FC = () => {
                 src={slide.posterUrl || slide.mediaUrl}
                 alt=""
                 aria-hidden="true"
-                className={`absolute inset-0 w-full h-full object-cover object-center ${kenBurnsAnim}`}
+                className={`absolute inset-0 w-full h-full object-cover object-center ${kenBurnsClass}`}
+                style={kenBurnsStyle}
                 referrerPolicy="no-referrer"
               />
 
@@ -225,7 +253,7 @@ export const HeroSlider: React.FC = () => {
                   }}
                   className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-500 ${
                     videoReady[slide.id] ? 'opacity-100' : 'opacity-0'
-                  } ${kenBurnsAnim}`}
+                  }`}
                 >
                   {slide.videoSources && slide.videoSources.length > 0 ? (
                     slide.videoSources.map((v, vIdx) => (
@@ -412,7 +440,9 @@ export const HeroSlider: React.FC = () => {
             <span className="text-slate-600">/</span>
             <span>0{activeSlides.length}</span>
             <span className="hidden sm:inline-block px-2 py-0.5 rounded-sm bg-slate-900 border border-slate-800 text-[10px] text-sky-400">
-              {currentSlide.mediaType === 'VIDEO' ? 'CINEMATIC VIDEO' : 'HIGH-RES IMAGE'}
+              {currentSlide.mediaType === 'VIDEO'
+                ? 'CINEMATIC VIDEO'
+                : `IMAGE · KEN BURNS (${currentSlide.kenBurnsMovement?.toUpperCase() || 'ZOOM-IN'})`}
             </span>
           </div>
 
